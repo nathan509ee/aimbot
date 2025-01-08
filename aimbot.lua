@@ -67,7 +67,7 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Holding = true
+        Holding = false
     end
 end)
 
