@@ -94,14 +94,15 @@ RunService.RenderStepped:Connect(function()
         if targetPlayer then
             local targetPart = targetPlayer.Character:FindFirstChild(_G.AimPart)
             if targetPart then
+                -- Posição do alvo
                 local targetPos = targetPart.Position
-                local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-
-                -- Movimento suave da câmera para o alvo
-                local tweenInfo = TweenInfo.new(_G.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-                local tweenGoal = {CFrame = targetCFrame}
-                local tween = TweenService:Create(Camera, tweenInfo, tweenGoal)
-                tween:Play()
+                -- Cálculo da direção para o alvo
+                local direction = (targetPos - Camera.CFrame.Position).unit
+                -- Ajustar a CFrame da câmera para olhar diretamente para o alvo
+                local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+                
+                -- Garantir que a câmera sempre olha para o alvo, sem mover demais
+                Camera.CFrame = newCFrame
             end
         end
     end
