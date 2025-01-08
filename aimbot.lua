@@ -10,7 +10,7 @@ _G.AimbotEnabled = true
 _G.TeamCheck = false -- Se ativado, só mira nos membros da equipe inimiga
 _G.AimPart = "Head" -- Parte do corpo para mira
 _G.Sensitivity = 0.0 -- Ajuste a sensibilidade (tempo em segundos para mover para o alvo)
-_G.CircleSides = 64 -- Lados do círculo FOV
+_G.CircleSides = 80 -- Lados do círculo FOV
 _G.CircleColor = Color3.fromRGB(255, 255, 255) -- Cor do círculo FOV
 _G.CircleTransparency = 0.7 -- Transparência do círculo
 _G.CircleRadius = 80 -- Raio do círculo FOV
@@ -42,12 +42,18 @@ local function GetClosestPlayer()
                     if humanoid.Health > 0 then
                         local targetPart = character:FindFirstChild(_G.AimPart)
                         if targetPart then
-                            local screenPos, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
-                            if onScreen then
-                                local distance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                                if distance < closestDist then
-                                    closestDist = distance
-                                    target = player
+                            -- Calcule a distância entre o jogador local e o alvo (em studs)
+                            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - targetPart.Position).Magnitude
+                            
+                            -- Verifique se a distância é menor que 100 studs
+                            if distance <= 100 then
+                                local screenPos, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
+                                if onScreen then
+                                    local mouseDist = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                                    if mouseDist < closestDist then
+                                        closestDist = mouseDist
+                                        target = player
+                                    end
                                 end
                             end
                         end
@@ -67,7 +73,7 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Holding = true
+        Holding = false
     end
 end)
 
