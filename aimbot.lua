@@ -8,7 +8,7 @@ local Holding = false
 
 _G.AimbotEnabled = true
 _G.TeamCheck = false -- Se ativado, só mira nos membros da equipe inimiga
-_G.AimPart = "Body" -- Parte do corpo para mira
+_G.AimPart = "Head" -- Parte do corpo para mira
 _G.Sensitivity = 0.0 -- Ajuste a sensibilidade (tempo em segundos para mover para o alvo)
 _G.CircleSides = 64 -- Lados do círculo FOV
 _G.CircleColor = Color3.fromRGB(255, 255, 255) -- Cor do círculo FOV
