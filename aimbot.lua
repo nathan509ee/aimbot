@@ -1,109 +1,151 @@
+-- UI e Serviços
+local UI = game:GetObjects("rbxassetid://2989692423")[1]
+local Services = setmetatable(game:GetChildren(), {
+    __index = function(self, ServiceName)
+        local Valid, Service = pcall(game.GetService, game, ServiceName)
+        if Valid then
+            self[ServiceName] = Service
+            return Service
+        end
+    end
+})
+
+local Me = Services.Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
+local Code = Services.HttpService:GenerateGUID(true)
+local DeltaSens
 local Holding = false
+local TargetPlayer = nil
 
-_G.AimbotEnabled = true
-_G.TeamCheck = false -- Se ativado, só mira nos membros da equipe inimiga
-_G.AimPart = "Head" -- Parte do corpo para mira
-_G.Sensitivity = 0.0 -- Ajuste a sensibilidade (tempo em segundos para mover para o alvo)
-_G.CircleSides = 80 -- Lados do círculo FOV
-_G.CircleColor = Color3.fromRGB(255, 255, 255) -- Cor do círculo FOV
-_G.CircleTransparency = 0.7 -- Transparência do círculo
-_G.CircleRadius = 120 -- Raio do círculo FOV
-_G.CircleFilled = false -- Se o círculo deve ser preenchido
-_G.CircleVisible = true -- Se o círculo é visível
-_G.CircleThickness = 1 -- Espessura do círculo
+-- Configurações
+local Settings = setmetatable({
+    Set = function(self, Setting, Value)
+        local Label = UI[Setting]
+        if Setting:sub(#Setting - 2) == "Key" then
+            Label.State.Text = Value.Name
+        else
+            Label.State.Text = Value and "ON" or "OFF"
+            Label.State.TextColor3 = Value and Color3.new(0,1,0) or Color3.new(1,0,0)
+        end
+    end,
+    Hook = function(self, Setting, Function)
+        return UI[Setting].State:GetPropertyChangedSignal("Text"):Connect(function()
+                Function(UI[Setting].State.Text == "ON")
+        end)
+    end
+}, {
+    __index = function(self, Setting)
+        if Setting:sub(#Setting - 2) == "Key" then
+            local Setting = UI[Setting].State.Text
+            return Setting ~= "Awaiting input..." and ((Setting:match("MouseButton") and Enum.UserInputType[Setting]) or Enum.KeyCode[Setting])
+        elseif UI[Setting]:FindFirstChild("Slide") then
+            return tonumber(UI[Setting].Value.Text)
+        else
+            return UI[Setting].State.Text == "ON"
+        end
+    end
+})
 
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-FOVCircle.Radius = _G.CircleRadius
-FOVCircle.Filled = _G.CircleFilled
-FOVCircle.Color = _G.CircleColor
-FOVCircle.Visible = _G.CircleVisible
-FOVCircle.Transparency = _G.CircleTransparency
-FOVCircle.NumSides = _G.CircleSides
-FOVCircle.Thickness = _G.CircleThickness
-
-local function GetClosestPlayer()
-    local maxDistance = _G.CircleRadius
-    local target = nil
-    local closestDist = maxDistance
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if _G.TeamCheck == false or (player.Team ~= LocalPlayer.Team) then
-                local character = player.Character
-                if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") then
-                    local humanoid = character.Humanoid
-                    if humanoid.Health > 0 then
-                        local targetPart = character:FindFirstChild(_G.AimPart)
-                        if targetPart then
-                            -- Calcule a distância entre o jogador local e o alvo (em studs)
-                            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - targetPart.Position).Magnitude
-                            
-                            -- Verifique se a distância é menor que 100 studs
-                            if distance <= 100 then
-                                local screenPos, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
-                                if onScreen then
-                                    local mouseDist = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                                    if mouseDist < closestDist then
-                                        closestDist = mouseDist
-                                        target = player
-                                    end
-                                end
-                            end
-                        end
-                    end
+-- Utility Functions
+local Utility = {
+    GetClosestPlayer = function(self)
+        local MousePos = Services.UserInputService:GetMouseLocation()
+        local Players = Services.Players:GetPlayers()
+        local Selected, Distance = nil, Settings.MaxDistance
+        for i = 1, #Players do
+            local Player = Players[i]
+            local Character = Player.Character or workspace:FindFirstChild(Player.Name, true)
+            local Head = Character and (Character:FindFirstChild(Settings.AimForHead and "Head" or "HumanoidRootPart", true) or Character.PrimaryPart)
+            if (Player ~= Me) and (self:IsValidHead(Head)) and ((Settings.TeamCheck and Player.TeamColor ~= Me.TeamColor) or (not Settings.TeamCheck)) then
+                local Point, Visible = Camera:WorldToScreenPoint(Head.Position)
+                if Visible then
+                    local SelectedDistance = (Vector2.new(Point.X, Point.Y) - MousePos).Magnitude
+                    local Eval = SelectedDistance <= Distance
+                    Selected = Eval and Head or Selected
+                    Distance = Eval and SelectedDistance or Distance
                 end
             end
         end
+        return Selected
+    end,
+    IsValidHead = function(self, Head)
+        if not Head then
+            return false
+        end
+        local Character = Head:FindFirstAncestorOfClass("Model")
+        local Humanoid = Character and (Character:FindFirstChildWhichIsA("Humanoid",true) or {Health = (Character:FindFirstChild("Health",true) or {Value = 1}).Value})
+        local _, Visible = Camera:WorldToViewportPoint(Head.Position)
+        return Humanoid and Visible and Humanoid.Health > 0
     end
-    return target
+}
+
+-- Círculo de FOV
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.Radius = Settings.CircleRadius
+FOVCircle.Filled = Settings.CircleFilled
+FOVCircle.Color = Settings.CircleColor
+FOVCircle.Visible = Settings.CircleVisible
+FOVCircle.Transparency = Settings.CircleTransparency
+FOVCircle.NumSides = Settings.CircleSides
+FOVCircle.Thickness = Settings.CircleThickness
+
+-- Função de movimento da câmera (Aimbot)
+local function MoveCameraToTarget()
+    local targetPart = TargetPlayer.Character:FindFirstChild(Settings.AimPart)
+    if targetPart then
+        local targetPos = targetPart.Position
+        local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+        local tweenInfo = TweenInfo.new(Settings.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+        local tweenGoal = {CFrame = targetCFrame}
+        local tween = TweenService:Create(Camera, tweenInfo, tweenGoal)
+        tween:Play()
+    end
 end
 
-UserInputService.InputBegan:Connect(function(input)
+-- Controles de Entrada
+Services.UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         Holding = true
     end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
+Services.UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         Holding = false
     end
 end)
 
-RunService.RenderStepped:Connect(function()
-    -- Atualizando a posição e as propriedades do círculo FOV
-    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
-    FOVCircle.Radius = _G.CircleRadius
-    FOVCircle.Filled = _G.CircleFilled
-    FOVCircle.Color = _G.CircleColor
-    FOVCircle.Visible = _G.CircleVisible
-    FOVCircle.Transparency = _G.CircleTransparency
-    FOVCircle.NumSides = _G.CircleSides
-    FOVCircle.Thickness = _G.CircleThickness
+-- RenderStep (Aimbot com controle de FOV)
+Services.RunService.RenderStepped:Connect(function()
+    -- Atualizando o círculo FOV
+    FOVCircle.Position = Vector2.new(Services.UserInputService:GetMouseLocation().X, Services.UserInputService:GetMouseLocation().Y)
+    FOVCircle.Radius = Settings.CircleRadius
+    FOVCircle.Filled = Settings.CircleFilled
+    FOVCircle.Color = Settings.CircleColor
+    FOVCircle.Visible = Settings.CircleVisible
+    FOVCircle.Transparency = Settings.CircleTransparency
+    FOVCircle.NumSides = Settings.CircleSides
+    FOVCircle.Thickness = Settings.CircleThickness
 
-    -- Aimbot: Só ativa quando o botão direito do mouse (MouseButton2) estiver pressionado
-    if Holding and _G.AimbotEnabled then
-        local targetPlayer = GetClosestPlayer()
-        if targetPlayer then
-            local targetPart = targetPlayer.Character:FindFirstChild(_G.AimPart)
-            if targetPart then
-                -- Posição do alvo
-                local targetPos = targetPart.Position
-                -- Cálculo da direção para o alvo
-                local direction = (targetPos - Camera.CFrame.Position).unit
-                -- Ajustar a CFrame da câmera para olhar diretamente para o alvo
-                local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-                
-                -- Garantir que a câmera sempre olha para o alvo, sem mover demais
-                Camera.CFrame = newCFrame
-            end
+    -- Aimbot (Somente enquanto o botão direito do mouse estiver pressionado)
+    if Holding and Settings.Functionality then
+        local closestPlayer = Utility:GetClosestPlayer()
+        if closestPlayer then
+            TargetPlayer = closestPlayer
+            MoveCameraToTarget()
         end
     end
 end)
+
+-- Ação de ativar/desativar o aimbot
+Services.ContextActionService:BindAction(Code.."CloseOpen", function(_, State)
+    if State == Enum.UserInputState.Begin and Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        UI.Visible = not UI.Visible
+    end
+end, false, Enum.KeyCode.Tab)
+
+-- Configuração inicial da UI
+Settings:Set("TeamCheck", #Services.Teams:GetChildren() > 0)
+UI.Name = Code
+UI.Parent = game:GetService("CoreGui"):FindFirstChildOfClass("ScreenGui")
