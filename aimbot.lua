@@ -12,7 +12,7 @@ _G.Sensitivity = 0.0 -- Ajuste a sensibilidade (tempo em segundos para mover par
 _G.CircleSides = 80 -- Lados do círculo FOV
 _G.CircleColor = Color3.fromRGB(255, 255, 255) -- Cor do círculo FOV
 _G.CircleTransparency = 0.7 -- Transparência do círculo
-_G.CircleRadius = 120 -- Raio do círculo FOV
+_G.CircleRadius = 160 -- Raio do círculo FOV
 _G.CircleFilled = false -- Se o círculo deve ser preenchido
 _G.CircleVisible = true -- Se o círculo é visível
 _G.CircleThickness = 1 -- Espessura do círculo
@@ -45,7 +45,7 @@ local function GetClosestPlayer()
                             local distance = (LocalPlayer.Character.HumanoidRootPart.Position - targetPart.Position).Magnitude
                             
                             -- Verifique se a distância é menor que 100 studs
-                            if distance <= 100 then
+                            if distance <= 200 then
                                 local screenPos, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
                                 if onScreen then
                                     local mouseDist = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
